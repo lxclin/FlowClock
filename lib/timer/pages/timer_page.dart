@@ -201,6 +201,7 @@ class _TimerPageState extends ConsumerState<TimerPage> {
   void _showAmbientSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -338,9 +339,10 @@ class _AmbientSoundSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(ambientSoundProvider);
+    final volume = ref.watch(ambientVolumeProvider);
     const sounds = AmbientSound.values;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -424,11 +426,13 @@ class _AmbientSoundSheet extends ConsumerWidget {
                 overlayColor: AppTheme.breakColor.withValues(alpha: 0.15),
               ),
               child: Slider(
-                value: 0.3,
+                value: volume,
                 min: 0.05,
                 max: 1.0,
-                onChanged: (v) =>
-                    ref.read(ambientSoundProvider.notifier).setVolume(v),
+                onChanged: (v) {
+                  ref.read(ambientVolumeProvider.notifier).state = v;
+                  ref.read(ambientSoundProvider.notifier).setVolume(v);
+                },
               ),
             ),
           ],

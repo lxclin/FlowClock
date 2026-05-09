@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../core/utils/vibration_util.dart';
 import '../../biometrics/providers/biometrics_provider.dart';
 import '../../biometrics/models/mental_state.dart';
+import '../../settings/providers/settings_provider.dart';
 import '../models/timer_state.dart';
 
 final timerProvider = StateNotifierProvider<TimerNotifier, TimerState>((ref) {
@@ -278,7 +280,14 @@ class TimerNotifier extends StateNotifier<TimerState> {
   }
 
   void _handleCompletion() {
-    VibrationUtil.timerComplete();
+    final settings = _ref.read(settingsProvider);
+    if (settings.vibrationEnabled) {
+      VibrationUtil.timerComplete();
+    }
+    if (settings.soundEnabled) {
+      final player = AudioPlayer();
+      player.play(AssetSource('assets/audio/complete.wav'));
+    }
 
     if (state.isMicroBreak || state.isBreathing) {
       if (state.isMicroBreak) {

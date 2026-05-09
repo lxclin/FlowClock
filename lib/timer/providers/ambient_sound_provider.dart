@@ -55,9 +55,10 @@ final ambientSoundProvider =
   return AmbientSoundNotifier();
 });
 
+final ambientVolumeProvider = StateProvider<double>((ref) => 0.3);
+
 class AmbientSoundNotifier extends StateNotifier<AmbientSound> {
   final AudioPlayer _player = AudioPlayer();
-  double _volume = 0.3;
 
   AmbientSoundNotifier() : super(AmbientSound.none);
 
@@ -66,15 +67,12 @@ class AmbientSoundNotifier extends StateNotifier<AmbientSound> {
     state = sound;
 
     if (sound != AmbientSound.none) {
-      await _player.setSource(AssetSource(sound.assetPath));
+      await _player.play(AssetSource(sound.assetPath));
       await _player.setReleaseMode(ReleaseMode.loop);
-      await _player.setVolume(_volume);
-      await _player.resume();
     }
   }
 
   Future<void> setVolume(double volume) async {
-    _volume = volume;
     await _player.setVolume(volume);
   }
 
