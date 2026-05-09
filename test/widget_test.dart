@@ -4,7 +4,7 @@ import 'package:flutter_pomodoro/app.dart';
 
 void main() {
   testWidgets('App renders timer page', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: PomodoroApp()));
+    await tester.pumpWidget(const ProviderScope(child: FlowClockApp()));
     await tester.pump();
     await tester.pump();
     expect(find.text('计时'), findsWidgets);

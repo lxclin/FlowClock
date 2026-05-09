@@ -1,5 +1,5 @@
 name: flutter_pomodoro
-description: A beautiful Pomodoro Timer app built with Flutter.
+description: FlowClock - A beautiful Pomodoro Timer app built with Flutter.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -26,3 +26,4 @@ flutter:
     - assets/audio/rain.wav
     - assets/audio/cafe.wav
     - assets/audio/forest.wav
+    - assets/audio/complete.wav

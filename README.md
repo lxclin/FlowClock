@@ -1,4 +1,4 @@
-# Pomodoro Timer
+# FlowClock
 
 一个基于 Flutter 构建的精美番茄钟应用，集成**生物识别驱动自适应专注**功能，支持 Android、iOS 和 Web 平台。
 
@@ -75,8 +75,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-username/Pomodoro_Timer.git
-cd Pomodoro_Timer
+git clone https://github.com/your-username/FlowClock.git
+cd FlowClock
 
 # 安装依赖
 flutter pub get

@@ -166,7 +166,7 @@ class SettingsPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Flutter Pomodoro',
+                      'FlowClock',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -175,7 +175,7 @@ class SettingsPage extends ConsumerWidget {
                     ),
                     SizedBox(height: 6),
                     Text(
-                      '版本 1.0.0\n基于 Flutter & Riverpod 构建\n一款极简番茄钟，提升你的专注效率。',
+                      '版本 1.0.0\n基于 Flutter & Riverpod 构建\n一款极简番茄钟，提升你的专注效率。\n\n作者：lxclin',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppTheme.textSecondary,

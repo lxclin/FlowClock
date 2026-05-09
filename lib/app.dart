@@ -12,14 +12,14 @@ import 'calibration/pages/calibration_page.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
-class PomodoroApp extends ConsumerStatefulWidget {
-  const PomodoroApp({super.key});
+class FlowClockApp extends ConsumerStatefulWidget {
+  const FlowClockApp({super.key});
 
   @override
-  ConsumerState<PomodoroApp> createState() => _PomodoroAppState();
+  ConsumerState<FlowClockApp> createState() => _FlowClockAppState();
 }
 
-class _PomodoroAppState extends ConsumerState<PomodoroApp> {
+class _FlowClockAppState extends ConsumerState<FlowClockApp> {
   int _currentIndex = 0;
 
   @override
@@ -61,34 +61,39 @@ class _PomodoroAppState extends ConsumerState<PomodoroApp> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                final biometricsNotifier = ref.read(biometricsProvider.notifier);
-                biometricsNotifier.setBiometricsEnabled(false);
-                Navigator.pop(navigatorKey.currentContext!);
-              },
-              child: const Text(
-                '暂不开启',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(navigatorKey.currentContext!);
-                Navigator.of(navigatorKey.currentContext!).push(
-                  MaterialPageRoute(builder: (_) => const CalibrationPage()),
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.workColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    final biometricsNotifier = ref.read(biometricsProvider.notifier);
+                    biometricsNotifier.setBiometricsEnabled(false);
+                    Navigator.pop(navigatorKey.currentContext!);
+                  },
+                  child: const Text(
+                    '暂不开启',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
                 ),
-              ),
-              child: const Text(
-                '开始测量',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(navigatorKey.currentContext!);
+                    Navigator.of(navigatorKey.currentContext!).push(
+                      MaterialPageRoute(builder: (_) => const CalibrationPage()),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.workColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    '开始测量',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -113,7 +118,7 @@ class _PomodoroAppState extends ConsumerState<PomodoroApp> {
     ];
 
     return MaterialApp(
-      title: 'Pomodoro',
+      title: 'FlowClock',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       navigatorKey: navigatorKey,
