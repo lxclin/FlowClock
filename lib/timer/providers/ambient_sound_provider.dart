@@ -63,12 +63,12 @@ class AmbientSoundNotifier extends StateNotifier<AmbientSound> {
   AmbientSoundNotifier() : super(AmbientSound.none);
 
   Future<void> setSound(AmbientSound sound) async {
-    await _player.stop();
     state = sound;
+    await _player.stop();
 
     if (sound != AmbientSound.none) {
-      await _player.play(AssetSource(sound.assetPath));
       await _player.setReleaseMode(ReleaseMode.loop);
+      await _player.play(AssetSource(sound.assetPath));
     }
   }
 
