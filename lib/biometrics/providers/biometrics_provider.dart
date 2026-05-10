@@ -9,6 +9,10 @@ import '../services/detect_mental_state.dart';
 import '../services/biometrics_repository.dart';
 import '../services/sensor_adapter.dart';
 import '../services/sensor_adapter_mock.dart';
+import '../services/health_sensor_adapter.dart';
+
+/// Which data source the biometrics pipeline is using.
+enum SensorMode { mock, health }
 
 class BiometricsState {
   final BiometricBaseline? baseline;
@@ -23,6 +27,18 @@ class BiometricsState {
   final int flowAlertCount;
   final DateTime? lastFatigueAlertTime;
 
+  /// Active sensor mode — `health` when real hardware is available,
+  /// `mock` otherwise.
+  final SensorMode sensorMode;
+
+  /// `true` when the device supports health-data hardware and the user has
+  /// granted permissions.
+  final bool healthAvailable;
+
+  /// Human-readable error when health initialisation fails (e.g. permissions
+  /// denied or unsupported device).
+  final String? healthError;
+
   const BiometricsState({
     this.baseline,
     this.isCalibrated = false,
@@ -35,6 +51,9 @@ class BiometricsState {
     this.lastAlertTime,
     this.flowAlertCount = 0,
     this.lastFatigueAlertTime,
+    this.sensorMode = SensorMode.mock,
+    this.healthAvailable = false,
+    this.healthError,
   });
 
   BiometricsState copyWith({
@@ -49,6 +68,10 @@ class BiometricsState {
     DateTime? lastAlertTime,
     int? flowAlertCount,
     DateTime? lastFatigueAlertTime,
+    SensorMode? sensorMode,
+    bool? healthAvailable,
+    String? healthError,
+    bool clearHealthError = false,
   }) {
     return BiometricsState(
       baseline: baseline ?? this.baseline,
@@ -62,6 +85,10 @@ class BiometricsState {
       lastAlertTime: lastAlertTime ?? this.lastAlertTime,
       flowAlertCount: flowAlertCount ?? this.flowAlertCount,
       lastFatigueAlertTime: lastFatigueAlertTime ?? this.lastFatigueAlertTime,
+      sensorMode: sensorMode ?? this.sensorMode,
+      healthAvailable: healthAvailable ?? this.healthAvailable,
+      healthError:
+          clearHealthError ? null : (healthError ?? this.healthError),
     );
   }
 }
@@ -88,13 +115,42 @@ class BiometricsNotifier extends StateNotifier<BiometricsState> {
     final calibrated = _repository.isCalibrated;
     final enabled = _repository.biometricsEnabled;
 
+    // Probe whether real health hardware is available.
+    // If the probe fails we stay in mock mode silently — the user can still
+    // use mock simulation in development or on devices without wearables.
+    bool healthOk = false;
+    if (enabled) {
+      healthOk = await _probeHealthAdapter();
+    }
+
     if (!_disposed) {
       state = state.copyWith(
         baseline: baseline ?? BiometricBaseline.defaults,
         isCalibrated: calibrated,
         biometricsEnabled: enabled,
+        healthAvailable: healthOk,
+        sensorMode: healthOk ? SensorMode.health : SensorMode.mock,
       );
     }
+  }
+
+  /// Tries to create and initialize a [HealthSensorAdapter].
+  /// Returns `true` when the health store is reachable and permissions are
+  /// granted.
+  Future<bool> _probeHealthAdapter() async {
+    try {
+      final adapter = HealthSensorAdapter();
+      final ok = await adapter.initialize();
+      if (ok) {
+        await adapter.dispose();
+        return true;
+      }
+      await adapter.dispose();
+    } catch (_) {
+      // Platform may not support health at all (desktop, web, or missing
+      // Google Play Services on Android).
+    }
+    return false;
   }
 
   Future<void> calibrate(List<BiometricSnapshot> readings) async {
@@ -150,12 +206,37 @@ class BiometricsNotifier extends StateNotifier<BiometricsState> {
     return guess;
   }
 
+  /// Creates the best available [SensorAdapter].
+  /// Prefers [HealthSensorAdapter] when health data is available; falls back
+  /// to [MockSensorAdapter] otherwise.  Returns `null` when no adapter can be
+  /// created (e.g. permissions permanently denied and no baseline exists).
+  Future<SensorAdapter?> _createAdapter() async {
+    if (state.healthAvailable) {
+      final healthAdapter = HealthSensorAdapter();
+      final ok = await healthAdapter.initialize();
+      if (ok) return healthAdapter;
+      await healthAdapter.dispose();
+
+      // Health probe failed at session time — record the error and fall back.
+      if (!_disposed) {
+        state = state.copyWith(
+          healthAvailable: false,
+          healthError: 'Health permission revoked. Using mock data.',
+          sensorMode: SensorMode.mock,
+        );
+      }
+    }
+
+    return MockSensorAdapter(
+      baseline: state.baseline ?? BiometricBaseline.defaults,
+    );
+  }
+
   Future<void> startSession(String sessionId) async {
     if (!state.biometricsEnabled) return;
     if (_sensor == null) {
-      _sensor = MockSensorAdapter(
-        baseline: state.baseline ?? BiometricBaseline.defaults,
-      );
+      _sensor = await _createAdapter();
+      if (_sensor == null) return;
       await _sensor!.initialize();
     }
     await _sensor!.startScanning();

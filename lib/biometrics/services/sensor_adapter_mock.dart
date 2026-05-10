@@ -14,6 +14,9 @@ class MockSensorAdapter implements SensorAdapter {
 
   MockSensorAdapter({required this.baseline});
 
+  @override
+  bool get isHardwareBacked => false;
+
   void setSimulateFlow(bool value) => _simulateFlow = value;
   void setSimulateFatigue(bool value) => _simulateFatigue = value;
 
