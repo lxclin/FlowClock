@@ -66,8 +66,6 @@ class _FlowClockAppState extends ConsumerState<FlowClockApp> {
               children: [
                 TextButton(
                   onPressed: () {
-                    final biometricsNotifier = ref.read(biometricsProvider.notifier);
-                    biometricsNotifier.setBiometricsEnabled(false);
                     Navigator.pop(navigatorKey.currentContext!);
                   },
                   child: const Text(
