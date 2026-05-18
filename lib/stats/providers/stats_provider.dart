@@ -1,116 +1,96 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
-import '../models/pomodoro_record.dart';
+import '../../core/database/database_helper.dart';
 
 final statsProvider = StateNotifierProvider<StatsNotifier, StatsState>((ref) {
   return StatsNotifier();
 });
 
 class StatsState {
-  final int todayCount;
-  final int totalMinutes;
-  final Map<String, int> dailyRecords;
-  final int workDurationSeconds;
+  final int todayFocusSeconds;
+  final int todayCompleted;
+  final int todayInterrupted;
+  final int todayAbandoned;
+  final int totalFocusSeconds;
+  final int totalSessions;
+  final List<Map<String, dynamic>> weeklyStats;
+  final List<Map<String, dynamic>> hourlyDistribution;
+  final List<Map<String, dynamic>> taskFocusData;
+  final bool isLoading;
 
   const StatsState({
-    this.todayCount = 0,
-    this.totalMinutes = 0,
-    this.dailyRecords = const {},
-    this.workDurationSeconds = 25 * 60,
+    this.todayFocusSeconds = 0,
+    this.todayCompleted = 0,
+    this.todayInterrupted = 0,
+    this.todayAbandoned = 0,
+    this.totalFocusSeconds = 0,
+    this.totalSessions = 0,
+    this.weeklyStats = const [],
+    this.hourlyDistribution = const [],
+    this.taskFocusData = const [],
+    this.isLoading = true,
   });
 
   StatsState copyWith({
-    int? todayCount,
-    int? totalMinutes,
-    Map<String, int>? dailyRecords,
-    int? workDurationSeconds,
+    int? todayFocusSeconds,
+    int? todayCompleted,
+    int? todayInterrupted,
+    int? todayAbandoned,
+    int? totalFocusSeconds,
+    int? totalSessions,
+    List<Map<String, dynamic>>? weeklyStats,
+    List<Map<String, dynamic>>? hourlyDistribution,
+    List<Map<String, dynamic>>? taskFocusData,
+    bool? isLoading,
   }) {
     return StatsState(
-      todayCount: todayCount ?? this.todayCount,
-      totalMinutes: totalMinutes ?? this.totalMinutes,
-      dailyRecords: dailyRecords ?? this.dailyRecords,
-      workDurationSeconds: workDurationSeconds ?? this.workDurationSeconds,
+      todayFocusSeconds: todayFocusSeconds ?? this.todayFocusSeconds,
+      todayCompleted: todayCompleted ?? this.todayCompleted,
+      todayInterrupted: todayInterrupted ?? this.todayInterrupted,
+      todayAbandoned: todayAbandoned ?? this.todayAbandoned,
+      totalFocusSeconds: totalFocusSeconds ?? this.totalFocusSeconds,
+      totalSessions: totalSessions ?? this.totalSessions,
+      weeklyStats: weeklyStats ?? this.weeklyStats,
+      hourlyDistribution: hourlyDistribution ?? this.hourlyDistribution,
+      taskFocusData: taskFocusData ?? this.taskFocusData,
+      isLoading: isLoading ?? this.isLoading,
     );
   }
 }
 
 class StatsNotifier extends StateNotifier<StatsState> {
   StatsNotifier() : super(const StatsState()) {
-    _loadStats();
+    refresh();
   }
 
-  static String get _todayKey => DateFormat('yyyy-MM-dd').format(DateTime.now());
+  Future<void> refresh() async {
+    final now = DateTime.now();
+    final today = await DatabaseHelper.instance.getDailyStats(now);
+    final weekly = await DatabaseHelper.instance.getWeeklyStats();
+    final hourly = await DatabaseHelper.instance.getHourlyDistribution(now);
 
-  Future<void> _loadStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    final records = prefs.getStringList('pomodoro_records') ?? [];
-    final totalMinutes = prefs.getInt('total_focus_minutes') ?? 0;
-    final workDuration = prefs.getInt('work_duration') ?? 25 * 60;
-
-    final Map<String, int> dailyMap = {};
-    for (final record in records) {
-      final parts = record.split(':');
-      if (parts.length == 2) {
-        dailyMap[parts[0]] = int.tryParse(parts[1]) ?? 0;
-      }
+    int totalFocus = 0;
+    int totalSessions = 0;
+    for (final w in weekly) {
+      totalFocus += (w['total_focus_seconds'] as int);
+      totalSessions += (w['completed_sessions'] as int);
     }
-
-    final todayCount = dailyMap[_todayKey] ?? 0;
-
-    if (mounted) {
-      state = StatsState(
-        todayCount: todayCount,
-        totalMinutes: totalMinutes,
-        dailyRecords: dailyMap,
-        workDurationSeconds: workDuration,
-      );
-    }
-  }
-
-  Future<void> incrementPomodoro() async {
-    final prefs = await SharedPreferences.getInstance();
-    final todayKey = _todayKey;
-
-    final newDailyRecords = Map<String, int>.from(state.dailyRecords);
-    newDailyRecords[todayKey] = (newDailyRecords[todayKey] ?? 0) + 1;
-
-    final recordsList = newDailyRecords.entries
-        .map((e) => '${e.key}:${e.value}')
-        .toList();
-
-    final minutesPerPomodoro = state.workDurationSeconds ~/ 60;
-    final newTotalMinutes = state.totalMinutes + minutesPerPomodoro;
-
-    await prefs.setStringList('pomodoro_records', recordsList);
-    await prefs.setInt('total_focus_minutes', newTotalMinutes);
 
     if (mounted) {
       state = state.copyWith(
-        todayCount: newDailyRecords[todayKey]!,
-        totalMinutes: newTotalMinutes,
-        dailyRecords: newDailyRecords,
+        todayFocusSeconds: today?['total_focus_seconds'] as int? ?? 0,
+        todayCompleted: today?['completed_sessions'] as int? ?? 0,
+        todayInterrupted: today?['interrupted_sessions'] as int? ?? 0,
+        todayAbandoned: today?['abandoned_sessions'] as int? ?? 0,
+        totalFocusSeconds: totalFocus,
+        totalSessions: totalSessions,
+        weeklyStats: weekly,
+        hourlyDistribution: hourly,
+        isLoading: false,
       );
     }
   }
 
-  List<DateTime> getWeekDates() {
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    return List.generate(7, (i) {
-      final date = monday.add(Duration(days: i));
-      return DateTime(date.year, date.month, date.day);
-    });
-  }
-
-  int getCountForDate(DateTime date) {
-    final key = PomodoroRecord.formatDate(date);
-    return state.dailyRecords[key] ?? 0;
-  }
-
   Future<void> updateWorkDuration(int seconds) async {
-    if (mounted) {
-      state = state.copyWith(workDurationSeconds: seconds);
-    }
+    // Stored in settings; actual stats use session data from DB.
   }
 }

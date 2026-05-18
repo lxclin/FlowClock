@@ -1,14 +1,12 @@
-enum TimerMode { work, shortBreak, longBreak }
+enum TimerMode { work, rest }
 
 extension TimerModeX on TimerMode {
   String get label {
     switch (this) {
       case TimerMode.work:
         return '专注';
-      case TimerMode.shortBreak:
-        return '短休息';
-      case TimerMode.longBreak:
-        return '长休息';
+      case TimerMode.rest:
+        return '休息';
     }
   }
 
@@ -16,10 +14,8 @@ extension TimerModeX on TimerMode {
     switch (this) {
       case TimerMode.work:
         return '🍅';
-      case TimerMode.shortBreak:
+      case TimerMode.rest:
         return '☕';
-      case TimerMode.longBreak:
-        return '🌿';
     }
   }
 }
@@ -33,8 +29,7 @@ class TimerState {
   final bool isRunning;
   final int sessionPomodoros;
   final int workDuration;
-  final int shortBreakDuration;
-  final int longBreakDuration;
+  final int breakDuration;
   final PendingAlertType? pendingAlert;
   final int flowExtensionsUsed;
   final bool isMicroBreak;
@@ -48,8 +43,7 @@ class TimerState {
     required this.isRunning,
     required this.sessionPomodoros,
     this.workDuration = 25 * 60,
-    this.shortBreakDuration = 5 * 60,
-    this.longBreakDuration = 15 * 60,
+    this.breakDuration = 5 * 60,
     this.pendingAlert,
     this.flowExtensionsUsed = 0,
     this.isMicroBreak = false,
@@ -69,8 +63,7 @@ class TimerState {
     bool? isRunning,
     int? sessionPomodoros,
     int? workDuration,
-    int? shortBreakDuration,
-    int? longBreakDuration,
+    int? breakDuration,
     PendingAlertType? pendingAlert,
     bool clearPendingAlert = false,
     int? flowExtensionsUsed,
@@ -85,14 +78,12 @@ class TimerState {
       isRunning: isRunning ?? this.isRunning,
       sessionPomodoros: sessionPomodoros ?? this.sessionPomodoros,
       workDuration: workDuration ?? this.workDuration,
-      shortBreakDuration: shortBreakDuration ?? this.shortBreakDuration,
-      longBreakDuration: longBreakDuration ?? this.longBreakDuration,
+      breakDuration: breakDuration ?? this.breakDuration,
       pendingAlert: clearPendingAlert ? null : (pendingAlert ?? this.pendingAlert),
       flowExtensionsUsed: flowExtensionsUsed ?? this.flowExtensionsUsed,
       isMicroBreak: isMicroBreak ?? this.isMicroBreak,
       isBreathing: isBreathing ?? this.isBreathing,
-      savedRemainingSeconds:
-          savedRemainingSeconds ?? this.savedRemainingSeconds,
+      savedRemainingSeconds: savedRemainingSeconds ?? this.savedRemainingSeconds,
     );
   }
 }

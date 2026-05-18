@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../core/utils/vibration_util.dart';
 import '../../biometrics/providers/biometrics_provider.dart';
 import '../../biometrics/models/mental_state.dart';
-import '../../settings/providers/settings_provider.dart';
+import '../../stats/providers/session_provider.dart';
+import '../../stats/providers/stats_provider.dart';
+import '../../todo/providers/task_provider.dart';
 import '../models/timer_state.dart';
+import 'active_task_provider.dart';
 
 final timerProvider = StateNotifierProvider<TimerNotifier, TimerState>((ref) {
   return TimerNotifier(ref);
@@ -29,37 +33,19 @@ class TimerNotifier extends StateNotifier<TimerState> {
     _loadSettings();
   }
 
-  BiometricsNotifier get _bioNotifier =>
-      _ref.read(biometricsProvider.notifier);
-
+  BiometricsNotifier get _bioNotifier => _ref.read(biometricsProvider.notifier);
   BiometricsState get _bioState => _ref.read(biometricsProvider);
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final work = prefs.getInt('work_duration') ?? 25 * 60;
-    final short = prefs.getInt('short_break_duration') ?? 5 * 60;
-    final long = prefs.getInt('long_break_duration') ?? 15 * 60;
-
+    final brk = prefs.getInt('break_duration') ?? 5 * 60;
     if (mounted) {
-      state = state.copyWith(
-        totalSeconds: work,
-        remainingSeconds: work,
-        workDuration: work,
-        shortBreakDuration: short,
-        longBreakDuration: long,
-      );
+      state = state.copyWith(breakDuration: brk);
     }
   }
 
   int _getDuration(TimerMode mode) {
-    switch (mode) {
-      case TimerMode.work:
-        return state.workDuration;
-      case TimerMode.shortBreak:
-        return state.shortBreakDuration;
-      case TimerMode.longBreak:
-        return state.longBreakDuration;
-    }
+    return mode == TimerMode.work ? state.workDuration : state.breakDuration;
   }
 
   void start() {
@@ -68,11 +54,9 @@ class TimerNotifier extends StateNotifier<TimerState> {
     _tickCount = 0;
     _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-
     if (state.mode == TimerMode.work && _bioState.biometricsEnabled) {
       _bioNotifier.startSession(_sessionId);
     }
-
     state = state.copyWith(isRunning: true);
   }
 
@@ -84,19 +68,48 @@ class TimerNotifier extends StateNotifier<TimerState> {
   }
 
   void toggle() {
-    if (state.isRunning) {
-      pause();
-    } else {
-      start();
-    }
+    state.isRunning ? pause() : start();
   }
 
   void reset() {
     _timer?.cancel();
     _timer = null;
-    _bioNotifier.stopSession();
     final duration = _getDuration(state.mode);
     state = state.copyWith(
+      remainingSeconds: duration,
+      totalSeconds: duration,
+      isRunning: false,
+      clearPendingAlert: true,
+      flowExtensionsUsed: 0,
+      isMicroBreak: false,
+      isBreathing: false,
+      savedRemainingSeconds: 0,
+    );
+  }
+
+  void resetToWorkWithDuration(int seconds) {
+    _timer?.cancel();
+    _timer = null;
+    state = state.copyWith(
+      mode: TimerMode.work,
+      remainingSeconds: seconds,
+      totalSeconds: seconds,
+      workDuration: seconds,
+      isRunning: false,
+      clearPendingAlert: true,
+      flowExtensionsUsed: 0,
+      isMicroBreak: false,
+      isBreathing: false,
+      savedRemainingSeconds: 0,
+    );
+  }
+
+  void resetToWork() {
+    final duration = state.workDuration;
+    _timer?.cancel();
+    _timer = null;
+    state = state.copyWith(
+      mode: TimerMode.work,
       remainingSeconds: duration,
       totalSeconds: duration,
       isRunning: false,
@@ -111,7 +124,6 @@ class TimerNotifier extends StateNotifier<TimerState> {
   void skip() {
     _timer?.cancel();
     _timer = null;
-    _bioNotifier.stopSession();
     VibrationUtil.light();
     _switchToNextMode();
   }
@@ -119,115 +131,27 @@ class TimerNotifier extends StateNotifier<TimerState> {
   void switchMode(TimerMode mode) {
     _timer?.cancel();
     _timer = null;
-    _bioNotifier.stopSession();
     final duration = _getDuration(mode);
     state = state.copyWith(
       mode: mode,
       remainingSeconds: duration,
       totalSeconds: duration,
       isRunning: false,
-      clearPendingAlert: true,
-      flowExtensionsUsed: 0,
-      isMicroBreak: false,
-      isBreathing: false,
-      savedRemainingSeconds: 0,
     );
   }
 
-  void updateDurations({
-    int? workDuration,
-    int? shortBreakDuration,
-    int? longBreakDuration,
-  }) {
+  void updateDurations({int? workDuration, int? breakDuration}) {
     state = state.copyWith(
       workDuration: workDuration ?? state.workDuration,
-      shortBreakDuration: shortBreakDuration ?? state.shortBreakDuration,
-      longBreakDuration: longBreakDuration ?? state.longBreakDuration,
+      breakDuration: breakDuration ?? state.breakDuration,
     );
-
     if (!state.isRunning) {
       final duration = _getDuration(state.mode);
-      state = state.copyWith(
-        remainingSeconds: duration,
-        totalSeconds: duration,
-      );
+      state = state.copyWith(remainingSeconds: duration, totalSeconds: duration);
     }
-  }
-
-  void extendWork({int additionalSeconds = 10 * 60}) {
-    state = state.copyWith(
-      totalSeconds: state.totalSeconds + additionalSeconds,
-      remainingSeconds: state.remainingSeconds + additionalSeconds,
-      clearPendingAlert: true,
-      flowExtensionsUsed: state.flowExtensionsUsed + 1,
-    );
-    _bioNotifier.resetAlertState();
-  }
-
-  void triggerMicroBreak() {
-    _timer?.cancel();
-    _timer = null;
-
-    state = state.copyWith(
-      isRunning: false,
-      isMicroBreak: true,
-      savedRemainingSeconds: state.remainingSeconds,
-      remainingSeconds: 2 * 60,
-      totalSeconds: 2 * 60,
-      clearPendingAlert: true,
-    );
-
-    _bioNotifier.resetAlertState();
-
-    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    _timer = Timer.periodic(
-        const Duration(seconds: 1), (_) => _microBreakTick());
-    state = state.copyWith(isRunning: true);
-  }
-
-  void triggerBreathingGuide() {
-    _timer?.cancel();
-    _timer = null;
-
-    state = state.copyWith(
-      isRunning: false,
-      isBreathing: true,
-      savedRemainingSeconds: state.remainingSeconds,
-      remainingSeconds: 3 * 60,
-      totalSeconds: 3 * 60,
-      clearPendingAlert: true,
-    );
-
-    _bioNotifier.resetAlertState();
-
-    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    _timer = Timer.periodic(
-        const Duration(seconds: 1), (_) => _breathingTick());
-    state = state.copyWith(isRunning: true);
-  }
-
-  void dismissAlert() {
-    state = state.copyWith(clearPendingAlert: true);
-    _bioNotifier.resetAlertState();
   }
 
   void _tick() {
-    _tickCount++;
-
-    if (state.mode == TimerMode.work &&
-        _bioState.biometricsEnabled &&
-        _bioState.isScanning &&
-        _tickCount % 30 == 0) {
-      final result = _bioNotifier.evaluate(_sessionId);
-      if (result != null && mounted) {
-        if (result.state == MentalState.flow) {
-          state = state.copyWith(pendingAlert: PendingAlertType.flow);
-        } else if (result.state == MentalState.fatigue) {
-          state = state.copyWith(pendingAlert: PendingAlertType.fatigue);
-        }
-      }
-    }
-
     if (state.remainingSeconds <= 0) {
       _timer?.cancel();
       _timer = null;
@@ -237,101 +161,81 @@ class TimerNotifier extends StateNotifier<TimerState> {
     state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
   }
 
-  void _microBreakTick() {
-    if (state.remainingSeconds <= 0) {
-      _timer?.cancel();
-      _timer = null;
-      _resumeFromMicroBreak();
-      return;
-    }
-    state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
-  }
+  void _handleCompletion() async {
+    VibrationUtil.timerComplete();
+    _playCompletionSound();
 
-  void _breathingTick() {
-    if (state.remainingSeconds <= 0) {
-      _timer?.cancel();
-      _timer = null;
-      _resumeFromBreathing();
-      return;
-    }
-    state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
-  }
+    final isWork = state.mode == TimerMode.work;
+    final newPomodoros = isWork ? state.sessionPomodoros + 1 : state.sessionPomodoros;
+    final nextMode = isWork ? TimerMode.rest : TimerMode.work;
+    final nextDuration = _getDuration(nextMode);
+    final completedSeconds = state.totalSeconds;
 
-  void _resumeFromMicroBreak() {
-    final duration = _getDuration(state.mode);
-    state = state.copyWith(
-      remainingSeconds: state.savedRemainingSeconds,
-      totalSeconds: duration,
-      isRunning: false,
-      isMicroBreak: false,
-      savedRemainingSeconds: 0,
-    );
-  }
-
-  void _resumeFromBreathing() {
-    final duration = _getDuration(state.mode);
-    state = state.copyWith(
-      remainingSeconds: state.savedRemainingSeconds,
-      totalSeconds: duration,
-      isRunning: false,
-      isBreathing: false,
-      savedRemainingSeconds: 0,
-    );
-  }
-
-  void _handleCompletion() {
-    final settings = _ref.read(settingsProvider);
-    if (settings.vibrationEnabled) {
-      VibrationUtil.timerComplete();
-    }
-    if (settings.soundEnabled) {
-      final player = AudioPlayer();
-      player.play(AssetSource('assets/audio/complete.wav'));
+    if (isWork) {
+      final taskId = _ref.read(activeTaskIdProvider);
+      final start = DateTime.now().subtract(Duration(seconds: completedSeconds));
+      try {
+        await SessionRecorder.recordCompleted(
+          taskId: taskId,
+          mode: 'work',
+          plannedSeconds: completedSeconds,
+          actualSeconds: completedSeconds,
+          startedAt: start,
+        );
+        if (taskId != null) {
+          await _ref.read(taskProvider.notifier).incrementPomodoro(taskId);
+        }
+        await _ref.read(statsProvider.notifier).refresh();
+      } catch (_) {}
     }
 
-    if (state.isMicroBreak || state.isBreathing) {
-      if (state.isMicroBreak) {
-        _resumeFromMicroBreak();
-      } else {
-        _resumeFromBreathing();
-      }
-      return;
+    if (mounted) {
+      state = state.copyWith(
+        mode: nextMode,
+        remainingSeconds: nextDuration,
+        totalSeconds: nextDuration,
+        isRunning: false,
+        sessionPomodoros: newPomodoros,
+      );
     }
-
-    final newPomodoros =
-        state.mode == TimerMode.work ? state.sessionPomodoros + 1 : state.sessionPomodoros;
-
-    state = state.copyWith(sessionPomodoros: newPomodoros);
-    _bioNotifier.stopSession();
-    _switchToNextMode();
   }
 
   void _switchToNextMode() {
-    final nextMode = state.mode == TimerMode.work
-        ? (state.sessionPomodoros % 4 == 0 ? TimerMode.longBreak : TimerMode.shortBreak)
-        : TimerMode.work;
-
+    final nextMode = state.mode == TimerMode.work ? TimerMode.rest : TimerMode.work;
     final nextDuration = _getDuration(nextMode);
-
     state = state.copyWith(
       mode: nextMode,
       remainingSeconds: nextDuration,
       totalSeconds: nextDuration,
       isRunning: false,
-      clearPendingAlert: true,
-      flowExtensionsUsed: 0,
-      isMicroBreak: false,
-      isBreathing: false,
-      savedRemainingSeconds: 0,
     );
   }
+
+  void autoStartRest() {
+    if (state.mode == TimerMode.rest && !state.isRunning) {
+      start();
+    }
+  }
+
+  void _playCompletionSound() async {
+    try {
+      final player = AudioPlayer();
+      await player.setVolume(0.8);
+      await player.play(AssetSource('assets/audio/complete.wav'));
+    } catch (_) {
+      // Silently ignore if audio not available
+    }
+  }
+
+  // Biometric alert stubs — preserved for dialog compatibility
+  void dismissAlert() {}
+  void triggerMicroBreak() {}
+  void triggerBreathingGuide() {}
+  void extendWork() {}
 
   @override
   void dispose() {
     _timer?.cancel();
-    try {
-      _bioNotifier.stopSession();
-    } catch (_) {}
     super.dispose();
   }
 }
