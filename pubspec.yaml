@@ -14,17 +14,20 @@ dependencies:
   shared_preferences: ^2.3.3
   audioplayers: ^6.1.0
   health: ^13.3.1
+  sqflite: ^2.4.1
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  sqflite_common_ffi: ^2.3.3+1
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/audio/white_noise.wav
-    - assets/audio/rain.wav
-    - assets/audio/cafe.wav
-    - assets/audio/forest.wav
     - assets/audio/complete.wav
+    - bgm/rain.mp3
+    - bgm/forest.mp3
+    - bgm/cafe.mp3
+    - bgm/white_noise.mp3

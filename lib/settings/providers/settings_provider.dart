@@ -7,30 +7,26 @@ final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>(
 
 class SettingsState {
   final int workDuration;
-  final int shortBreakDuration;
-  final int longBreakDuration;
+  final int breakDuration;
   final bool soundEnabled;
   final bool vibrationEnabled;
 
   const SettingsState({
     this.workDuration = 25 * 60,
-    this.shortBreakDuration = 5 * 60,
-    this.longBreakDuration = 15 * 60,
+    this.breakDuration = 5 * 60,
     this.soundEnabled = true,
     this.vibrationEnabled = true,
   });
 
   SettingsState copyWith({
     int? workDuration,
-    int? shortBreakDuration,
-    int? longBreakDuration,
+    int? breakDuration,
     bool? soundEnabled,
     bool? vibrationEnabled,
   }) {
     return SettingsState(
       workDuration: workDuration ?? this.workDuration,
-      shortBreakDuration: shortBreakDuration ?? this.shortBreakDuration,
-      longBreakDuration: longBreakDuration ?? this.longBreakDuration,
+      breakDuration: breakDuration ?? this.breakDuration,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
     );
@@ -47,30 +43,17 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (mounted) {
       state = SettingsState(
         workDuration: prefs.getInt('work_duration') ?? 25 * 60,
-        shortBreakDuration: prefs.getInt('short_break_duration') ?? 5 * 60,
-        longBreakDuration: prefs.getInt('long_break_duration') ?? 15 * 60,
+        breakDuration: prefs.getInt('break_duration') ?? 5 * 60,
         soundEnabled: prefs.getBool('sound_enabled') ?? true,
         vibrationEnabled: prefs.getBool('vibration_enabled') ?? true,
       );
     }
   }
 
-  Future<void> setWorkDuration(int seconds) async {
+  Future<void> setBreakDuration(int seconds) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('work_duration', seconds);
-    state = state.copyWith(workDuration: seconds);
-  }
-
-  Future<void> setShortBreakDuration(int seconds) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('short_break_duration', seconds);
-    state = state.copyWith(shortBreakDuration: seconds);
-  }
-
-  Future<void> setLongBreakDuration(int seconds) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('long_break_duration', seconds);
-    state = state.copyWith(longBreakDuration: seconds);
+    await prefs.setInt('break_duration', seconds);
+    state = state.copyWith(breakDuration: seconds);
   }
 
   Future<void> toggleSound() async {

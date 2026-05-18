@@ -9,5 +9,5 @@ void main() {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  runApp(const ProviderScope(child: FlowClockApp()));
+  runApp(const ProviderScope(child: PomodoroApp()));
 }
